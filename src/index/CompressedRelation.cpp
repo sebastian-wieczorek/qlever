@@ -220,7 +220,6 @@ CompressedRelationReader::asyncParallelBlockGeneratorIR(
       cancellationHandle->throwIfCancelled();
       std::unique_lock lock{blockIteratorMutex};
       if (blockMetadataIterator == endBlock) {
-        slog("produced empty");
         return std::nullopt;
       }
       // Note: taking a copy here is probably not necessary (the lifetime of
@@ -234,7 +233,6 @@ CompressedRelationReader::asyncParallelBlockGeneratorIR(
       auto myIndex = static_cast<size_t>(blockMetadataIterator - beginBlock);
       ++blockMetadataIterator;
       if (scanConfig.graphFilter_.canBlockBeSkipped(blockMetadata)) {
-        slog("produced1 ", myIndex);
         return std::pair{myIndex, std::nullopt};
       }
       // Note: the reading of the blockMetadata could also happen without
@@ -246,7 +244,6 @@ CompressedRelationReader::asyncParallelBlockGeneratorIR(
       lock.unlock();
       auto decompressedBlockAndMetadata = decompressAndPostprocessBlock(
           compressedBlock, blockMetadata.numRows_, scanConfig, blockMetadata);
-      slog("produced2 ", myIndex);
       return std::pair{myIndex,
                        std::optional{std::move(decompressedBlockAndMetadata)}};
     };
@@ -451,6 +448,7 @@ CompressedRelationReader::asyncParallelBlockGeneratorIR(
     }
 
     // Some sanity checks.
+    // TODO @ccoecontrol sanity checks disabled until inputrange can share details
     // const auto& limit = originalLimit._limit;
     // AD_CORRECTNESS_CHECK(!limit.has_value() ||
     //                      details.numElementsYielded_ <= limit.value());
@@ -1938,8 +1936,6 @@ CompressedRelationReader::asyncParallelBlockGeneratorIR(
         static_cast<size_t>(blockAndMetadata.containsUpdates_);
     ++numBlocksRead_;
     numElementsRead_ += blockAndMetadata.block_.numRows();
-
-    slog("details update ", numBlocksPostprocessed_, ", ", numBlocksWithUpdate_, ", ", numBlocksRead_, ", ", numElementsRead_);
 }
 
   // _____________________________________________________________________________
