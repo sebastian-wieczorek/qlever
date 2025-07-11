@@ -790,13 +790,7 @@ class CompressedRelationReader {
   // in the correct order, but asynchronously read and decompressed using
   // multiple worker threads.
   template <typename T>
-  IdTableGenerator asyncParallelBlockGenerator(
-      T beginBlock, T endBlock, const ScanImplConfig& scanConfig,
-      CancellationHandle cancellationHandle,
-      LimitOffsetClause& limitOffset) const;
-
-  template <typename T>
-  IdTableGeneratorIR asyncParallelBlockGeneratorIR(
+  IdTableGeneratorIR asyncParallelBlockGenerator(
       T beginBlock, T endBlock, const ScanImplConfig& scanConfig,
       CancellationHandle cancellationHandle,
       LimitOffsetClause& limitOffset) const;
