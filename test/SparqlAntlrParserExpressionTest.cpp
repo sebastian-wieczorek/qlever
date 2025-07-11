@@ -324,6 +324,8 @@ TEST(SparqlParser, FunctionCall) {
                      matchUnary(&makeIsGeoPointExpression));
   expectFunctionCall(absl::StrCat(geof, "envelope>(?x)"),
                      matchUnary(&makeEnvelopeExpression));
+  expectFunctionCall(absl::StrCat(geof, "geometryType>(?x)"),
+                     matchUnary(&makeGeometryTypeExpression));
 
   // The different distance functions:
   expectFunctionCall(
@@ -392,6 +394,10 @@ TEST(SparqlParser, FunctionCall) {
       absl::StrCat(geof, "sfOverlaps>(?a, ?b)"),
       matchNary(&makeGeoRelationExpression<SpatialJoinType::OVERLAPS>,
                 Variable{"?a"}, Variable{"?b"}));
+  expectFunctionCall(
+      absl::StrCat(geof, "sfWithin>(?a, ?b)"),
+      matchNary(&makeGeoRelationExpression<SpatialJoinType::WITHIN>,
+                Variable{"?a"}, Variable{"?b"}));
 
   // Math functions
   expectFunctionCall(absl::StrCat(math, "log>(?x)"),
@@ -441,6 +447,9 @@ TEST(SparqlParser, FunctionCall) {
   expectFunctionCallFails(absl::StrCat(geof, "envelope>()"));
   expectFunctionCallFails(absl::StrCat(geof, "envelope>(?a, ?b)"));
   expectFunctionCallFails(absl::StrCat(geof, "envelope>(?a, ?b, ?c)"));
+  expectFunctionCallFails(absl::StrCat(geof, "geometryType>()"));
+  expectFunctionCallFails(absl::StrCat(geof, "geometryType>(?a, ?b)"));
+  expectFunctionCallFails(absl::StrCat(geof, "geometryType>(?a, ?b, ?c)"));
 
   expectFunctionCallFails(absl::StrCat(geof, "sfIntersects>(?a)"));
   expectFunctionCallFails(absl::StrCat(geof, "sfIntersects>()"));
@@ -465,6 +474,10 @@ TEST(SparqlParser, FunctionCall) {
   expectFunctionCallFails(absl::StrCat(geof, "sfOverlaps>(?a)"));
   expectFunctionCallFails(absl::StrCat(geof, "sfOverlaps>()"));
   expectFunctionCallFails(absl::StrCat(geof, "sfOverlaps>(?a, ?b, ?c)"));
+
+  expectFunctionCallFails(absl::StrCat(geof, "sfWithin>(?a)"));
+  expectFunctionCallFails(absl::StrCat(geof, "sfWithin>()"));
+  expectFunctionCallFails(absl::StrCat(geof, "sfWithin>(?a, ?b, ?c)"));
 
   expectFunctionCallFails(absl::StrCat(xsd, "date>(?varYear, ?varMonth)"));
   expectFunctionCallFails(absl::StrCat(xsd, "dateTime>(?varYear, ?varMonth)"));
