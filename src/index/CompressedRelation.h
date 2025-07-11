@@ -584,8 +584,7 @@ class CompressedRelationReader {
     void aggregate(const LazyScanMetadata& newValue);
   };
 
-  using IdTableGenerator = cppcoro::generator<IdTable, LazyScanMetadata>;
-  using IdTableGeneratorIR = ad_utility::InputRangeTypeErased<IdTable, LazyScanMetadata>;
+  using IdTableGenerator = ad_utility::InputRangeTypeErased<IdTable, LazyScanMetadata>;
 
  private:
   // The allocator used to allocate intermediate buffers.
@@ -648,13 +647,6 @@ class CompressedRelationReader {
   // computed and returned as a generator of the single blocks that are scanned.
   // The blocks are guaranteed to be in order.
   CompressedRelationReader::IdTableGenerator lazyScan(
-      ScanSpecification scanSpec,
-      std::vector<CompressedBlockMetadata> relevantBlockMetadata,
-      ColumnIndices additionalColumns, CancellationHandle cancellationHandle,
-      const LocatedTriplesPerBlock& locatedTriplesPerBlock,
-      LimitOffsetClause limitOffset = {}) const;
-
-  CompressedRelationReader::IdTableGeneratorIR lazyScanIR(
       ScanSpecification scanSpec,
       std::vector<CompressedBlockMetadata> relevantBlockMetadata,
       ColumnIndices additionalColumns, CancellationHandle cancellationHandle,
@@ -790,7 +782,7 @@ class CompressedRelationReader {
   // in the correct order, but asynchronously read and decompressed using
   // multiple worker threads.
   template <typename T>
-  IdTableGeneratorIR asyncParallelBlockGenerator(
+  IdTableGenerator asyncParallelBlockGenerator(
       T beginBlock, T endBlock, const ScanImplConfig& scanConfig,
       CancellationHandle cancellationHandle,
       LimitOffsetClause& limitOffset) const;

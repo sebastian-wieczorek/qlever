@@ -39,6 +39,13 @@ void slog(Args... args) {
   ((std::cout << args), ...) << '\n';
 }
 
+void log_idtable(const IdTable& t)
+{
+  std::string l{std::to_string(t.numColumns()) + ":" + std::to_string(t.numRows())};
+
+  // slog(l);
+}
+
 using namespace std::chrono_literals;
 
 // A small helper function to obtain the begin and end iterator of a range
@@ -143,14 +150,14 @@ static void pruneBlock(T& block, LimitOffsetClause& limitOffset) {
 }
 
 template <typename T>
-CompressedRelationReader::IdTableGeneratorIR
+CompressedRelationReader::IdTableGenerator
 CompressedRelationReader::asyncParallelBlockGenerator(
     T beginBlock, T endBlock, const ScanImplConfig& scanConfig,
     CancellationHandle cancellationHandle,
     LimitOffsetClause& limitOffset) const {
   // Empty range.
   if (beginBlock == endBlock) {
-    return IdTableGeneratorIR{};
+    return IdTableGenerator{};
   }
 
   using ReadCompressedBlockFromFileFunc = std::function<CompressedBlock(
@@ -246,11 +253,11 @@ CompressedRelationReader::asyncParallelBlockGenerator(
 
         popTimer.stop();
         cancellationHandle->throwIfCancelled();
-        details->update(optBlock);
+        details().update(optBlock);
         if (optBlock.has_value()) {
           auto& block = optBlock.value().block_;
           pruneBlock(block, limitOffset);
-          details->numElementsYielded_ += block.numRows();
+          details().numElementsYielded_ += block.numRows();
           if (!block.empty()) {
             popTimer.cont();
             return block;
@@ -369,20 +376,10 @@ bool CompressedRelationReader::FilterDuplicatesAndGraphs::canBlockBeSkipped(
       });
 }
 
-CompressedRelationReader::IdTableGenerator CompressedRelationReader::lazyScan(
-    ScanSpecification scanSpec,
-    std::vector<CompressedBlockMetadata> relevantBlockMetadata,
-    ColumnIndices additionalColumns, CancellationHandle cancellationHandle,
-    const LocatedTriplesPerBlock& locatedTriplesPerBlock,
-    LimitOffsetClause limitOffset) const {
-  return fromInputRange(lazyScanIR(scanSpec, relevantBlockMetadata,
-                                   additionalColumns, cancellationHandle,
-                                   locatedTriplesPerBlock, limitOffset));
-}
-
+int x{0};
 // _____________________________________________________________________________
-CompressedRelationReader::IdTableGeneratorIR
-CompressedRelationReader::lazyScanIR(
+CompressedRelationReader::IdTableGenerator
+CompressedRelationReader::lazyScan(
     ScanSpecification scanSpec,
     std::vector<CompressedBlockMetadata> relevantBlockMetadata,
     ColumnIndices additionalColumns, CancellationHandle cancellationHandle,
@@ -395,7 +392,7 @@ CompressedRelationReader::lazyScanIR(
   const auto originalLimit = limitOffset;
 
   if (relevantBlockMetadata.empty()) {
-    return IdTableGeneratorIR{};
+    return IdTableGenerator{};
   }
 
   struct Generator : ad_utility::InputRangeFromGet<IdTable, LazyScanMetadata> {
@@ -415,83 +412,86 @@ CompressedRelationReader::lazyScanIR(
     std::vector<CompressedBlockMetadata>::iterator endBlockMetadata;
     const CompressedRelationReader* reader;
     ScanImplConfig config;
+    bool start{false};
+    IdTableGenerator middleBlocksGenerator{};
 
-    Generator(ScanSpecification scanSpec,
+    Generator(ScanSpecification scanSpec_,
               std::vector<CompressedBlockMetadata> relevantBlockMetadata_,
-              ColumnIndices additionalColumns,
-              CancellationHandle cancellationHandle,
-              const LocatedTriplesPerBlock& locatedTriplesPerBlock,
-              LimitOffsetClause limitOffset,
-              const CompressedRelationReader* reader)
-        : scanSpec{scanSpec},
+              ColumnIndices additionalColumns_,
+              CancellationHandle cancellationHandle_,
+              const LocatedTriplesPerBlock& locatedTriplesPerBlock_,
+              LimitOffsetClause limitOffset_,
+              const CompressedRelationReader* reader_,
+            ScanImplConfig config_)
+        : scanSpec{scanSpec_},
           relevantBlockMetadata{std::move(relevantBlockMetadata_)},
-          additionalColumns{std::move(additionalColumns)},
-          cancellationHandle{cancellationHandle},
-          locatedTriplesPerBlock{locatedTriplesPerBlock},
-          limitOffset{limitOffset},
-          reader{reader},
-          config{getScanConfig(scanSpec, additionalColumns,
-                               locatedTriplesPerBlock)} {
+          additionalColumns{std::move(additionalColumns_)},
+          cancellationHandle{cancellationHandle_},
+          locatedTriplesPerBlock{locatedTriplesPerBlock_},
+          limitOffset{limitOffset_},
+          reader{reader_},
+          config{config_} {
       beginBlockMetadata = ql::ranges::begin(relevantBlockMetadata);
       endBlockMetadata = ql::ranges::end(relevantBlockMetadata);
-
-      auto s = relevantBlockMetadata.size();
-
-      auto x1 = (beginBlockMetadata < endBlockMetadata);
-      auto x2 = (beginBlockMetadata + 1 < endBlockMetadata);
-
-      std::cout << s << " " << x1 << " " << x2 << std::endl;
     }
 
     auto getIncompleteBlock(std::vector<CompressedBlockMetadata>::iterator it) {
       auto result = reader->readPossiblyIncompleteBlock(
-          scanSpec, config, *it, std::ref(*details), locatedTriplesPerBlock);
+          scanSpec, config, *it, std::ref(details()), locatedTriplesPerBlock);
       cancellationHandle->throwIfCancelled();
       return result;
     };
 
     std::optional<IdTable> get() override {
+      if(!start)
+      {
+        start = true;
+        slog("start", x++);
+      }
+
       if (!firstBlockYielded) {
         firstBlockYielded = true;
         // Get and yield the first block.
         if (beginBlockMetadata < endBlockMetadata) {
-          auto firstBlock = getIncompleteBlock(beginBlockMetadata);
-          pruneBlock(firstBlock, limitOffset);
-          details->numElementsYielded_ += firstBlock.numRows();
-          if (!firstBlock.empty()) {
-            return firstBlock;
+          auto block = getIncompleteBlock(beginBlockMetadata);
+          log_idtable(block);
+          pruneBlock(block, limitOffset);
+          details().numElementsYielded_ += block.numRows();
+          if (!block.empty()) {
+            log_idtable(block);
+            return block;
           }
         }
       }
 
-      bool x1 = (bool)(beginBlockMetadata < endBlockMetadata);
-      bool x2 = (bool)(beginBlockMetadata + 1 < endBlockMetadata);
-      //  std::cout << x1 << " " << x2 << "\n";
       // Get and yield the remaining blocks.
       if (beginBlockMetadata + 1 < endBlockMetadata) {
         if (!middleBlocksYielded) {
           middleBlocksYielded = true;
 
           if (!generatorCreated) {
-            auto blockGenerator = reader->asyncParallelBlockGenerator(
+            generatorCreated = true;
+            middleBlocksGenerator = reader->asyncParallelBlockGenerator(
                 beginBlockMetadata + 1, endBlockMetadata - 1, config,
                 cancellationHandle, limitOffset);
-            blockGenerator.details() = details;
+            middleBlocksGenerator.setDetailsPointer(&details());
           }
 
-          auto block{blockGenerator.get()};
-          if (block) {
-            return block;
+          auto block{middleBlocksGenerator.get()};
+          if (block.has_value()) {
+            log_idtable(block.value());
+            return block.value();
           }
         }
 
         if (!lastBlockYielded) {
           lastBlockYielded = true;
-          auto lastBlock = getIncompleteBlock(endBlockMetadata - 1);
-          pruneBlock(lastBlock, limitOffset);
-          if (!lastBlock.empty()) {
-            details->numElementsYielded_ += lastBlock.numRows();
-            return lastBlock;
+          auto block = getIncompleteBlock(endBlockMetadata - 1);
+          pruneBlock(block, limitOffset);
+          if (!block.empty()) {
+            details().numElementsYielded_ += block.numRows();
+            log_idtable(block);
+            return block;
           }
         }
       }
@@ -511,22 +511,16 @@ CompressedRelationReader::lazyScanIR(
       //                           details.numBlocksSkippedBecauseOfGraph_);
       //     });
 
+      slog("end", x);
       return std::nullopt;
     }
   };
+  auto config =
+      getScanConfig(scanSpec, additionalColumns, locatedTriplesPerBlock);
 
-  auto s = relevantBlockMetadata.size();
-  auto b = relevantBlockMetadata.begin();
-  auto e = relevantBlockMetadata.end();
-
-  auto x1 = (b < e);
-  auto x2 = (b + 1 < e);
-
-  std::cout << s << " " << x1 << " " << x2 << std::endl;
-
-  return IdTableGeneratorIR{
+  return IdTableGenerator{
       Generator{scanSpec, std::move(relevantBlockMetadata), additionalColumns,
-                cancellationHandle, locatedTriplesPerBlock, limitOffset, this}};
+                cancellationHandle, locatedTriplesPerBlock, limitOffset, this, config}};
 }
 
 // Helper function that enables a comparison of a triple with an `Id` in
