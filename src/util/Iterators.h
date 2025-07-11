@@ -284,18 +284,25 @@ class InputRangeFromGet {
   virtual Storage get() = 0;
 
   virtual ~InputRangeFromGet() = default;
-  InputRangeFromGet() = default;
   InputRangeFromGet(InputRangeFromGet&&) = default;
   InputRangeFromGet& operator=(InputRangeFromGet&&) = default;
   InputRangeFromGet(const InputRangeFromGet&) = default;
   InputRangeFromGet& operator=(const InputRangeFromGet&) = default;
+
+  InputRangeFromGet()
+  {
+    if constexpr (hasDetails)
+    {
+      details = std::make_shared<DetailsType>();
+    }
+  }
 
   // Get the next value and store it.
   void getNextAndStore() { storage_ = get(); }
 
   static constexpr bool hasDetails = !std::is_same_v<DetailsType, NoDetails>;
 // Details storage
-  DetailsType details;
+  std::shared_ptr<DetailsType> details;
   
   struct Sentinel {};
   class Iterator {
@@ -455,7 +462,7 @@ class InputRangeTypeErased {
   decltype(auto) get() { return impl_->get(); }
   using iterator = typename InputRangeFromGet<ValueType>::Iterator;
   
-  DetailsType& details() { return impl_->details; }
+  std::shared_ptr<DetailsType>& details() { return impl_->details; }
 };
 
 template <typename Range>

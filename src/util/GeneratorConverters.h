@@ -10,7 +10,7 @@ cppcoro::generator<ValueType, DetailsType> fromInputRange(
     ad_utility::InputRangeTypeErased<ValueType, DetailsType> inputRange) {
 
   DetailsType& details = co_await cppcoro::getDetails;
-  details = inputRange.details();
+  details = *inputRange.details();
 
   for (auto& value : inputRange) {
     co_yield value;
