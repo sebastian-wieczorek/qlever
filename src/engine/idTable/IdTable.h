@@ -747,12 +747,6 @@ class IdTable {
       std::optional<size_t> endIdx = std::nullopt,
       std::optional<std::vector<ColumnIndex>> permutation = std::nullopt,
       typename Table::single_value_type defaultValue = {}) {
-
-    auto c1 = table.numColumns() == numColumns();
-    auto c2 = permutation.has_value();
-    auto c3 = permutation.has_value() && numColumns() == permutation->size();
-
-    std::cout << c1 << " "<< c2 << " "<< c3 << "\n";
     AD_CORRECTNESS_CHECK(
         table.numColumns() == numColumns() ||
         (permutation.has_value() && numColumns() == permutation->size()));
