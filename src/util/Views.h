@@ -180,8 +180,9 @@ CPP_template(typename UnderlyingRange, bool supportConst = true)(
     return ql::ranges::size(underlyingRange_);
   }
 
-  CPP_member constexpr auto size() const -> CPP_ret(size_t)(
-      requires ql::ranges::sized_range<const UnderlyingRange>) {
+  CPP_member constexpr auto size() const
+      -> CPP_ret(size_t)(
+          requires ql::ranges::sized_range<const UnderlyingRange>) {
     return ql::ranges::size(underlyingRange_);
   }
 
@@ -404,26 +405,21 @@ CPP_template(typename Range, typename ElementType)(
     ReChunkAtSeparatorFromGet(Range generator, ElementType separator)
         : generator_{generator},
           separator_{separator},
-          flattenData_{ql::views::join(generator)},
+          flattenData_{ql::views::join(generator_)},
           iter_{ranges::begin(flattenData_)},
           splitView_{ad_utility::OwningView{ranges::views::split(
               flattenData_ | ranges::views::common, separator)}},
-          splitIter_{splitView_.begin()} {}
+          splitIter_{ql::ranges::begin(splitView_)} {}
 
     std::optional<ql::span<ElementType>> get() override {
-      if (iter_ == ranges::end(flattenData_)) {
-        return std::nullopt;
+      if (splitIter_ != ql::ranges::end(splitView_)) {
+        auto value{*splitIter_};
+        buffer_ = ql::ranges::to<std::vector<ElementType>>(value);
+        ++splitIter_;
+        return ql::span(buffer_.begin(), buffer_.size());
       }
 
-      while (iter_ != ranges::end(flattenData_)) {
-        iter_++;
-      }
-      // auto&& chunk = *splitIter_;
-      // buffer_ =
-      //     ranges::to<std::vector<ElementType>>(chunk |
-      //     ranges::views::common);
-      // ++splitIter_;
-      return std::span{buffer_.begin(), buffer_.end()};
+      return std::nullopt;
     }
   };
 

@@ -210,12 +210,7 @@ TEST(Views, verifyLineByLineWorksWithChunksBiggerThanLines) {
   EXPECT_EQ(toView(*iterator), "defghij");
 
   ++iterator;
-  ++iterator;
-  ++iterator;
-  ++iterator;
-  ++iterator;
-  ++iterator;
-  ASSERT_EQ(iterator, lineByLineGenerator.end());
+  ASSERT_TRUE(iterator == lineByLineGenerator.end());
 }
 
 TEST(Views, CallbackOnEndView) {
