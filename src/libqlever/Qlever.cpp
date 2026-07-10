@@ -18,15 +18,19 @@
 #include "index/TextIndexBuilder.h"
 #include "libqlever/QleverTypes.h"
 #include "parser/SparqlParser.h"
+#include "util/PmrUtils.h"
 #include "util/http/UrlParser.h"
 
 namespace qlever {
 
 // _____________________________________________________________________________
-Qlever::Qlever(const EngineConfig& config)
-    : allocator_{ad_utility::AllocatorWithLimit<Id>{
+Qlever::Qlever(const EngineConfig& config,
+               ql::pmr::memory_resource* memory_resource)
+    : memory_resource_{memory_resource},
+      allocator_{ad_utility::AllocatorWithLimit<Id>{
           ad_utility::makeAllocationMemoryLeftThreadsafeObject(
               config.memoryLimit_.value_or(DEFAULT_MEM_FOR_QUERIES)),
+          memory_resource_,
           [this](ad_utility::MemorySize numMemoryToAllocate) {
             cache_.makeRoomAsMuchAsPossible(MAKE_ROOM_SLACK_FACTOR *
                                             numMemoryToAllocate);

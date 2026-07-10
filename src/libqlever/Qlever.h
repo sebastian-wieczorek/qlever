@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "backports/memory_resource.h"
 #include "engine/MaterializedViews.h"
 #include "engine/NamedResultCache.h"
 #include "engine/NamedResultCacheSerializer.h"
@@ -237,6 +238,7 @@ class Qlever {
  private:
   // The cache is threadsafe, so making it `mutable` is reasonably safe.
   mutable QueryResultCache cache_;
+  ql::pmr::memory_resource* memory_resource_;
   ad_utility::AllocatorWithLimit<Id> allocator_;
   SortPerformanceEstimator sortPerformanceEstimator_;
   mutable NamedResultCache namedResultCache_;
@@ -252,7 +254,8 @@ class Qlever {
 
   // Create a QLever instance for querying using an `EngineConfig` as
   // explained above.
-  explicit Qlever(const EngineConfig& config);
+  explicit Qlever(const EngineConfig& config,
+                  ql::pmr::memory_resource* memory_resource = nullptr);
 
   using PlannedQuery = qlever::PlannedQuery;
 

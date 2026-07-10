@@ -11,6 +11,7 @@
 #include <memory>
 
 #include "backports/functional.h"
+#include "backports/memory_resource.h"
 #include "util/MemorySize/MemorySize.h"
 #include "util/Synchronized.h"
 
@@ -152,7 +153,7 @@ class AllocatorWithLimit {
   detail::AllocationMemoryLeftThreadsafe
       memoryLeft_;                       // shared number of free bytes
   ClearOnAllocation clearOnAllocation_;  // TODO<joka921> comment
-  std::allocator<T> allocator_;
+  ql::pmr::memory_resource* memory_resource_;
 
  public:
   /// obtain an AllocationMemoryLeftThreadsafe by calls to
@@ -160,8 +161,18 @@ class AllocatorWithLimit {
   explicit AllocatorWithLimit(
       detail::AllocationMemoryLeftThreadsafe ml,
       ClearOnAllocation clearOnAllocation = noClearOnAllocation)
+      : AllocatorWithLimit(std::move(ml), ql::pmr::get_default_resource(),
+                           std::move(clearOnAllocation)) {}
+
+  explicit AllocatorWithLimit(
+      detail::AllocationMemoryLeftThreadsafe ml,
+      ql::pmr::memory_resource* const memory_resource,
+      ClearOnAllocation clearOnAllocation = noClearOnAllocation)
       : memoryLeft_{std::move(ml)},
-        clearOnAllocation_{std::move(clearOnAllocation)} {}
+        clearOnAllocation_{std::move(clearOnAllocation)},
+        memory_resource_{memory_resource == nullptr
+                             ? ql::pmr::get_default_resource()
+                             : memory_resource} {}
 
   /// Obtain an AllocatorWithLimit<OtherType> that refers to the
   /// same limit.
@@ -228,14 +239,18 @@ class AllocatorWithLimit {
       clearOnAllocation_(bytesNeeded);
       memoryLeft_.ptr()->wlock()->decrease_if_enough_left_or_throw(bytesNeeded);
     }
+
     // the actual allocation
-    return allocator_.allocate(n);
+    ql::pmr::polymorphic_allocator<T> allocator{memory_resource_};
+    return allocator.allocate(n);
   }
 
   // An allocator must have a function "deallocate" with exactly this signature.
   void deallocate(T* p, std::size_t n) {
     // free the memory
-    allocator_.deallocate(p, n);
+    ql::pmr::polymorphic_allocator<T> allocator{memory_resource_};
+    allocator.deallocate(p, n);
+
     // Update the amount of memory left.
     memoryLeft_.ptr()->wlock()->increase(MemorySize::bytes(n * sizeof(T)));
   }
